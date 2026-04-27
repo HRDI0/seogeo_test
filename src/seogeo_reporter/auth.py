@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .security import TokenCipher
 
 GOOGLE_AUTH_BASE = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -49,6 +50,31 @@ class FileTokenStore:
         if not path.exists():
             return None
         return json.loads(path.read_text(encoding="utf-8"))
+
+
+class SecureTokenStore(FileTokenStore):
+    """File token store with envelope encryption (encrypt-then-MAC)."""
+
+    def __init__(self, cipher: TokenCipher, base_dir: str = ".secrets/tokens") -> None:
+        super().__init__(base_dir=base_dir)
+        self.cipher = cipher
+
+    def save(self, key: str, token_payload: dict[str, Any]) -> None:
+        path = self._path(key)
+        payload = dict(token_payload)
+        payload["saved_at"] = int(time.time())
+        encrypted = self.cipher.encrypt_dict(payload)
+        path.write_text(json.dumps({"encrypted": encrypted}, ensure_ascii=False), encoding="utf-8")
+
+    def load(self, key: str) -> dict[str, Any] | None:
+        path = self._path(key)
+        if not path.exists():
+            return None
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        encrypted = raw.get("encrypted")
+        if not encrypted:
+            return None
+        return self.cipher.decrypt_dict(encrypted)
 
 
 class GoogleOAuthService:

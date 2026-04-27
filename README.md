@@ -21,6 +21,16 @@
 - 엑셀 작성기 (`openpyxl` 설치 시 동작)
 - 월간 파이프라인 + CLI 실행기
 
+## 배포/보안 준비
+
+- 배포 가이드: `docs/deployment-vercel-render-r2.md`
+- 인프라 템플릿: `deploy/render.yaml`
+- 환경변수 예시:
+  - `deploy/vercel.env.example`
+  - `deploy/render.env.example`
+- 토큰 암호화 모듈: `src/seogeo_reporter/security.py`
+- 암호화 저장소: `SecureTokenStore` (`src/seogeo_reporter/auth.py`)
+
 ## 전체 기능 테스트 스크립트
 
 ```bash
