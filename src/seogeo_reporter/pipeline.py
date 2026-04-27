@@ -1,18 +1,27 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from pathlib import Path
 
 from .collectors import PromptTracker
 from .connectors import GA4Connector, GSCConnector
+from .excel_writer import SeoGeoExcelWriter
 from .models import MonthlyReportInput, MonthlyReportPayload
 from .tiering import enrich_tier
 
 
 class MonthlyReportPipeline:
-    def __init__(self, ga4: GA4Connector, gsc: GSCConnector, tracker: PromptTracker) -> None:
+    def __init__(
+        self,
+        ga4: GA4Connector,
+        gsc: GSCConnector,
+        tracker: PromptTracker,
+        excel_writer: SeoGeoExcelWriter | None = None,
+    ) -> None:
         self.ga4 = ga4
         self.gsc = gsc
         self.tracker = tracker
+        self.excel_writer = excel_writer
 
     def collect(self, client_name: str, site_url: str, month: str, prompt_set: list[dict[str, str]]) -> MonthlyReportInput:
         ga4_summary = asdict(self.ga4.fetch_monthly_summary(site_url=site_url, month=month))
@@ -48,3 +57,8 @@ class MonthlyReportPipeline:
             keyword_rows=keyword_rows,
             summary_rows=summary_rows,
         )
+
+    def export_excel(self, payload: MonthlyReportPayload, output_path: str) -> Path:
+        if self.excel_writer is None:
+            raise RuntimeError("Excel writer is not configured.")
+        return self.excel_writer.write(payload=payload, output_path=output_path)

@@ -1,42 +1,46 @@
-# MVP 로드맵
+# 구현 상태 (우선순위 반영)
 
-## Phase 1 — GA4/GSC + 엑셀 자동 채우기
+## 1) Google OAuth 및 토큰 저장소
 
-- OAuth scope 최소화
-  - GA4: `analytics.readonly`
-  - GSC: `webmasters.readonly`
-- 수집 스키마 확정
-  - `ga4_monthly_metrics`
-  - `gsc_query_metrics`
-- 템플릿 탭 매핑
-  - `중위키워드추적`
-  - `월간종합리포트`
+- `GoogleOAuthService`
+  - 인증 URL 생성
+  - authorization code 교환
+  - refresh token 갱신
+- `FileTokenStore`
+  - 사이트/클라이언트 key 기반 JSON 저장
 
-## Phase 2 — API 기반 프롬프트 추적
+## 2) GA4/GSC 실데이터 커넥터
 
-- 공통 `PromptTracker` 인터페이스로 엔진별 구현
-  - OpenAI Responses + web_search
-  - Gemini grounding
-  - Perplexity Sonar
-- 실행 결과 정규화
-  - citations
-  - official link 여부
-  - 브랜드 언급 위치
-- Tier 자동 판정
+- `RealGA4Connector`
+  - `runReport` 호출
+  - Organic/Referral/Conversions 요약 집계
+- `RealGSCConnector`
+  - Search Analytics 호출
+  - 전월/당월 query 지표 병합
 
-## Phase 3 — Browser 기반 검증
+## 3) Prompt API 커넥터
 
-- Playwright 워커 분리
-- 스크린샷/HTML snapshot 아티팩트 저장
-- UI 기반 신호 추출
-  - citation 카드 가시성
-  - 링크 노출 여부
-  - 추가 패널(소스, 쇼핑, 지도 등)
+- `OpenAIPromptTracker`
+- `GeminiPromptTracker`
+- `PerplexityPromptTracker`
 
-## 운영 정책
+공통 `BaseApiPromptTracker`로 결과를 `PromptResult`로 정규화.
 
-- 기본은 API 모드
-- Browser 모드는 검증/증빙용
-- 월간 비교를 위해 실행 조건 고정
-  - locale: `ko-KR`
-  - 지역/계정/시간대 통제
+## 4) Browser 추적기
+
+- `PlaywrightPromptTracker`
+  - 프롬프트별 screenshot + HTML snapshot 저장
+  - 런타임 의존성(playwright) 없을 경우 명확한 예외 반환
+
+## 5) 엑셀 템플릿 Writer
+
+- `SeoGeoExcelWriter`
+  - 템플릿 복사 후 시트별 셀 작성
+  - `리포트개요`, `GEO프롬프트테스트결과`, `중위키워드추적`, `월간종합리포트`
+  - 런타임 의존성(openpyxl) 없을 경우 명확한 예외 반환
+
+## 남은 작업
+
+- 실제 운영용 engine별 browser adapter (로그인/네비게이션)
+- 키워드/프롬프트 대량 처리용 큐/스케줄러 통합
+- 엑셀 시트별 정확 셀 매핑 검증 (실양식 기준)
