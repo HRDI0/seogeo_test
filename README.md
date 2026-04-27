@@ -21,6 +21,24 @@
 - 엑셀 작성기 (`openpyxl` 설치 시 동작)
 - 월간 파이프라인 + CLI 실행기
 
+## Hybrid AI Visibility 추적 구조
+
+이 프로젝트는 API-only가 아닌 하이브리드 추적 구조를 지원하도록 확장했습니다.
+
+- Prompt Library: `src/seogeo_reporter/prompt_library.py`
+- Hybrid Pipeline: `src/seogeo_reporter/hybrid_pipeline.py`
+- Capture/Signal 모델: `src/seogeo_reporter/hybrid_models.py`
+- Parsing: `src/seogeo_reporter/parsing.py`
+- Metrics: `src/seogeo_reporter/scoring.py`
+- SERP 수집기 스텁: `src/seogeo_reporter/serp_collectors.py`
+
+가시성 등급(Tier 0~4):
+- Tier 0: 브랜드 미언급
+- Tier 1: 브랜드 언급
+- Tier 2: 브랜드 + 제3자 citation
+- Tier 3: 브랜드 + 공식 도메인 citation
+- Tier 4: 상위 추천/긍정 문맥 + 공식 citation
+
 ## 배포/보안 준비
 
 - 배포 가이드: `docs/deployment-vercel-render-r2.md`
