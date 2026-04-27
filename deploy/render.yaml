@@ -5,7 +5,7 @@ services:
     plan: starter
     region: singapore
     buildCommand: pip install -r requirements.txt
-    startCommand: python -m src.seogeo_reporter.cli --month 2026-03 --mode mock --prompt-mode mock
+    startCommand: python -m src.seogeo_reporter.runner
     envVars:
       - key: APP_ENV
         value: production
@@ -28,7 +28,7 @@ services:
     plan: starter
     region: singapore
     buildCommand: pip install -r requirements.txt
-    startCommand: python -m src.seogeo_reporter.cli --month 2026-03 --mode mock --prompt-mode mock
+    startCommand: python -m src.seogeo_reporter.runner
     envVars:
       - key: APP_ENV
         value: production
@@ -44,7 +44,7 @@ services:
     runtime: python
     schedule: "0 2 1 * *"
     buildCommand: pip install -r requirements.txt
-    startCommand: python -m src.seogeo_reporter.cli --month 2026-03 --mode mock --prompt-mode mock
+    startCommand: python -m src.seogeo_reporter.runner
     envVars:
       - key: APP_ENV
         value: production

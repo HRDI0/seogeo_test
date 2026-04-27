@@ -22,6 +22,13 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(restored["access_token"], "abc")
         self.assertEqual(restored["refresh_token"], "def")
 
+    def test_token_cipher_tamper_detection(self) -> None:
+        cipher = self._cipher()
+        encrypted = cipher.encrypt_dict({"access_token": "x"})
+        tampered = encrypted[:-4] + "AAAA"
+        with self.assertRaises(Exception):
+            cipher.decrypt_dict(tampered)
+
     def test_secure_token_store_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             store = SecureTokenStore(cipher=self._cipher(), base_dir=tmp)

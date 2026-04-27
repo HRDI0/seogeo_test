@@ -31,6 +31,18 @@
 - 토큰 암호화 모듈: `src/seogeo_reporter/security.py`
 - 암호화 저장소: `SecureTokenStore` (`src/seogeo_reporter/auth.py`)
 
+## 배치 실행 엔트리포인트
+
+```bash
+python -m src.seogeo_reporter.runner
+```
+
+환경변수:
+- `REPORT_MONTH` (기본: 전월 자동 계산)
+- `RUN_MODE` (`mock`/`real`)
+- `PROMPT_MODE` (`mock`/`openai`/`gemini`/`perplexity`/`browser`)
+- `TOKEN_STORE_MODE` (`plain`/`encrypted`)
+
 ## 전체 기능 테스트 스크립트
 
 ```bash

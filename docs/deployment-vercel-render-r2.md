@@ -46,3 +46,10 @@ python -c "from src.seogeo_reporter.security import generate_key_b64; print(gene
 - 프론트엔드에는 백엔드 base URL만 노출
 - 감사 로그: 토큰 접근/복호화 이벤트 기록
 - 키 로테이션 절차 문서화(신규 키로 재암호화 배치)
+
+
+## 7) 실행 엔트리포인트
+
+- Render web/worker/cron은 `python -m src.seogeo_reporter.runner`를 사용한다.
+- 실행 대상 월은 `REPORT_MONTH`(YYYY-MM) 미지정 시 전월 자동 계산.
+- 토큰 저장 모드는 `TOKEN_STORE_MODE=encrypted|plain`으로 제어한다.

@@ -45,6 +45,18 @@ assert 'auth_url' in data and 'state' in data
 print('[PASS] oauth output JSON schema check')
 PY
 
+
+# 3.5) Runner smoke mode should succeed
+run_cmd "runner smoke mode" bash -lc 'RUN_MODE=mock PROMPT_MODE=mock python -m src.seogeo_reporter.runner > /tmp/seogeo_runner.json'
+python - <<'PY'
+import json
+from pathlib import Path
+p = Path('/tmp/seogeo_runner.json')
+data = json.loads(p.read_text(encoding='utf-8'))
+assert data.get('status') == 'ok'
+assert 'month' in data
+print('[PASS] runner output JSON schema check')
+PY
 # 4) Browser mode is expected to fail when playwright is missing
 set +e
 python -m src.seogeo_reporter.cli --month 2026-03 --mode mock --prompt-mode browser > /tmp/seogeo_browser.json 2>&1
