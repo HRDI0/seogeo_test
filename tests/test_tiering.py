@@ -31,6 +31,20 @@ class TieringTests(unittest.TestCase):
         )
         self.assertEqual(classify_tier(row), Tier.TIER_2)
 
+    def test_tier_3_when_indirect_signal_exists(self) -> None:
+        row = PromptResult(
+            engine="gpt",
+            capture_method="api",
+            prompt_id="p4",
+            prompt_type="비교형",
+            prompt_text="x",
+            answer_text="x",
+            brand_mention_yn=False,
+            official_link_yn=False,
+            competitor_mention_count=1,
+        )
+        self.assertEqual(classify_tier(row), Tier.TIER_3)
+
     def test_tier_4_when_no_signal(self) -> None:
         row = PromptResult(
             engine="gpt",

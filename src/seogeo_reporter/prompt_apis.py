@@ -18,11 +18,18 @@ class ApiEngineConfig:
     model: str
     api_key: str
 
+    def validate(self) -> None:
+        if not self.model:
+            raise ValueError("model is required")
+        if not self.api_key:
+            raise ValueError("api_key is required")
+
 
 class BaseApiPromptTracker(PromptTracker):
     engine_name = "api"
 
     def __init__(self, config: ApiEngineConfig) -> None:
+        config.validate()
         self.config = config
 
     def run(self, prompt_set: list[dict[str, str]]) -> list[PromptResult]:
@@ -39,7 +46,7 @@ class BaseApiPromptTracker(PromptTracker):
                     prompt_text=prompt,
                     answer_text=response.get("answer_text", ""),
                     citations=response.get("citations", []),
-                    visible_links=response.get("citations", []),
+                    visible_links=response.get("visible_links", response.get("citations", [])),
                     brand_mention_yn=response.get("brand_mention_yn", False),
                     official_link_yn=response.get("official_link_yn", False),
                     mention_position=response.get("mention_position"),
@@ -65,7 +72,7 @@ class BaseApiPromptTracker(PromptTracker):
             with urllib.request.urlopen(req, timeout=60) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except Exception as exc:
-            raise PromptApiError(f"Prompt API request failed: {exc}") from exc
+            raise PromptApiError(f"Prompt API request failed ({url}): {exc}") from exc
 
 
 class OpenAIPromptTracker(BaseApiPromptTracker):
@@ -85,18 +92,21 @@ class OpenAIPromptTracker(BaseApiPromptTracker):
             },
             payload=payload,
         )
-        text = ""
+        text_parts: list[str] = []
         citations: list[str] = []
+
         for item in data.get("output", []):
             for content in item.get("content", []):
-                if content.get("type") == "output_text":
-                    text += content.get("text", "")
-                    for annotation in content.get("annotations", []):
-                        url = annotation.get("url")
-                        if url:
-                            citations.append(url)
+                if content.get("type") != "output_text":
+                    continue
+                text_parts.append(content.get("text", ""))
+                for annotation in content.get("annotations", []):
+                    url = annotation.get("url")
+                    if url:
+                        citations.append(url)
+
         return {
-            "answer_text": text,
+            "answer_text": "\n".join(filter(None, text_parts)),
             "citations": sorted(set(citations)),
         }
 

@@ -6,6 +6,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
+from .date_utils import month_range, previous_month
 from .models import KeywordMonthlyMetric
 
 
@@ -22,6 +23,8 @@ class GoogleApiError(RuntimeError):
 
 class GoogleHttpClient:
     def __init__(self, access_token: str) -> None:
+        if not access_token:
+            raise ValueError("access_token is required")
         self.access_token = access_token
 
     def post_json(self, url: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -33,7 +36,7 @@ class GoogleHttpClient:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except Exception as exc:
-            raise GoogleApiError(f"Google API request failed: {exc}") from exc
+            raise GoogleApiError(f"Google API request failed ({url}): {exc}") from exc
 
 
 class GA4Connector:
@@ -47,81 +50,72 @@ class GSCConnector:
 
 
 class RealGA4Connector(GA4Connector):
-    """Fetches monthly summary from GA4 Data API runReport endpoint."""
+    """Fetch monthly summary from GA4 Data API runReport endpoint."""
 
     def __init__(self, property_id: str, client: GoogleHttpClient) -> None:
+        if not property_id:
+            raise ValueError("property_id is required")
         self.property_id = property_id
         self.client = client
 
     def fetch_monthly_summary(self, site_url: str, month: str) -> GA4MonthlySummary:
         _ = site_url
-        start_date = f"{month}-01"
-        end_date = f"{month}-31"
+        current = month_range(month)
         url = f"https://analyticsdata.googleapis.com/v1beta/properties/{self.property_id}:runReport"
         payload = {
-            "dateRanges": [{"startDate": start_date, "endDate": end_date}],
+            "dateRanges": [{"startDate": current.start_date, "endDate": current.end_date}],
             "dimensions": [{"name": "sessionDefaultChannelGroup"}],
             "metrics": [{"name": "sessions"}, {"name": "conversions"}],
             "limit": 100,
         }
         data = self.client.post_json(url, payload)
-        organic_sessions = 0
-        referral_sessions = 0
-        conversions = 0
-        for row in data.get("rows", []):
-            channel = row.get("dimensionValues", [{}])[0].get("value", "")
-            sessions = int(float(row.get("metricValues", [{"value": "0"}])[0].get("value", "0")))
-            row_conversions = int(float(row.get("metricValues", [{}, {"value": "0"}])[1].get("value", "0")))
-            conversions += row_conversions
-            if channel.lower() == "organic search":
-                organic_sessions += sessions
-            if channel.lower() == "referral":
-                referral_sessions += sessions
-        return GA4MonthlySummary(
-            organic_sessions=organic_sessions,
-            referral_sessions=referral_sessions,
-            conversions=conversions,
-        )
+        return _parse_ga4_channel_rows(data.get("rows", []))
 
 
 class RealGSCConnector(GSCConnector):
-    """Fetches query level metrics from Search Console Search Analytics API."""
+    """Fetch query-level metrics from Search Console Search Analytics API."""
 
     def __init__(self, client: GoogleHttpClient, row_limit: int = 250) -> None:
+        if row_limit <= 0:
+            raise ValueError("row_limit must be > 0")
         self.client = client
         self.row_limit = row_limit
 
     def fetch_keyword_metrics(self, site_url: str, month: str) -> list[KeywordMonthlyMetric]:
-        current_start = f"{month}-01"
-        current_end = f"{month}-31"
-        prev_month = _previous_month(month)
-        prev_start = f"{prev_month}-01"
-        prev_end = f"{prev_month}-31"
+        current = month_range(month)
+        prev = month_range(previous_month(month))
 
-        previous = self._query(site_url, prev_start, prev_end)
-        current = self._query(site_url, current_start, current_end)
+        previous_rows = self._query_all(site_url, prev.start_date, prev.end_date)
+        current_rows = self._query_all(site_url, current.start_date, current.end_date)
 
-        keywords = sorted(set(previous) | set(current))
-        rows: list[KeywordMonthlyMetric] = []
-        for keyword in keywords:
-            p = previous.get(keyword, {})
-            c = current.get(keyword, {})
-            rows.append(
-                KeywordMonthlyMetric(
-                    keyword=keyword,
-                    previous_impressions=int(p.get("impressions", 0)),
-                    current_impressions=int(c.get("impressions", 0)),
-                    previous_clicks=int(p.get("clicks", 0)),
-                    current_clicks=int(c.get("clicks", 0)),
-                    previous_ctr=float(p.get("ctr", 0.0)) * 100,
-                    current_ctr=float(c.get("ctr", 0.0)) * 100,
-                    previous_position=float(p.get("position", 0.0)),
-                    current_position=float(c.get("position", 0.0)),
-                )
-            )
-        return rows
+        keywords = sorted(set(previous_rows) | set(current_rows))
+        return [self._merge_keyword_rows(keyword, previous_rows.get(keyword), current_rows.get(keyword)) for keyword in keywords]
 
-    def _query(self, site_url: str, start_date: str, end_date: str) -> dict[str, dict[str, float]]:
+    def _query_all(self, site_url: str, start_date: str, end_date: str) -> dict[str, dict[str, float]]:
+        start_row = 0
+        output: dict[str, dict[str, float]] = {}
+
+        while True:
+            rows = self._query_page(site_url, start_date, end_date, start_row)
+            if not rows:
+                break
+
+            for row in rows:
+                key = (row.get("keys") or [""])[0]
+                output[key] = {
+                    "clicks": float(row.get("clicks", 0)),
+                    "impressions": float(row.get("impressions", 0)),
+                    "ctr": float(row.get("ctr", 0)),
+                    "position": float(row.get("position", 0)),
+                }
+
+            if len(rows) < self.row_limit:
+                break
+            start_row += self.row_limit
+
+        return output
+
+    def _query_page(self, site_url: str, start_date: str, end_date: str, start_row: int) -> list[dict[str, Any]]:
         encoded_site = urllib.parse.quote(site_url, safe="")
         api_url = f"https://searchconsole.googleapis.com/webmasters/v3/sites/{encoded_site}/searchAnalytics/query"
         payload = {
@@ -129,19 +123,30 @@ class RealGSCConnector(GSCConnector):
             "endDate": end_date,
             "dimensions": ["query"],
             "rowLimit": self.row_limit,
-            "startRow": 0,
+            "startRow": start_row,
         }
         data = self.client.post_json(api_url, payload)
-        output: dict[str, dict[str, float]] = {}
-        for row in data.get("rows", []):
-            key = (row.get("keys") or [""])[0]
-            output[key] = {
-                "clicks": float(row.get("clicks", 0)),
-                "impressions": float(row.get("impressions", 0)),
-                "ctr": float(row.get("ctr", 0)),
-                "position": float(row.get("position", 0)),
-            }
-        return output
+        return data.get("rows", [])
+
+    @staticmethod
+    def _merge_keyword_rows(
+        keyword: str,
+        previous: dict[str, float] | None,
+        current: dict[str, float] | None,
+    ) -> KeywordMonthlyMetric:
+        p = previous or {}
+        c = current or {}
+        return KeywordMonthlyMetric(
+            keyword=keyword,
+            previous_impressions=int(p.get("impressions", 0)),
+            current_impressions=int(c.get("impressions", 0)),
+            previous_clicks=int(p.get("clicks", 0)),
+            current_clicks=int(c.get("clicks", 0)),
+            previous_ctr=float(p.get("ctr", 0.0)) * 100,
+            current_ctr=float(c.get("ctr", 0.0)) * 100,
+            previous_position=float(p.get("position", 0.0)),
+            current_position=float(c.get("position", 0.0)),
+        )
 
 
 class MockGA4Connector(GA4Connector):
@@ -172,10 +177,26 @@ class MockGSCConnector(GSCConnector):
         ]
 
 
-def _previous_month(month: str) -> str:
-    year, mon = month.split("-")
-    y = int(year)
-    m = int(mon)
-    if m == 1:
-        return f"{y - 1}-12"
-    return f"{y:04d}-{m - 1:02d}"
+def _parse_ga4_channel_rows(rows: list[dict[str, Any]]) -> GA4MonthlySummary:
+    organic_sessions = 0
+    referral_sessions = 0
+    conversions = 0
+
+    for row in rows:
+        channel = row.get("dimensionValues", [{}])[0].get("value", "")
+        metric_values = row.get("metricValues", [])
+        sessions = int(float((metric_values[0] if len(metric_values) > 0 else {}).get("value", "0")))
+        row_conversions = int(float((metric_values[1] if len(metric_values) > 1 else {}).get("value", "0")))
+        conversions += row_conversions
+
+        channel_lower = channel.lower()
+        if channel_lower == "organic search":
+            organic_sessions += sessions
+        elif channel_lower == "referral":
+            referral_sessions += sessions
+
+    return GA4MonthlySummary(
+        organic_sessions=organic_sessions,
+        referral_sessions=referral_sessions,
+        conversions=conversions,
+    )

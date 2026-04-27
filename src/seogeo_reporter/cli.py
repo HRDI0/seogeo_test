@@ -8,16 +8,15 @@ from dataclasses import asdict
 from .auth import GoogleOAuthService, oauth_config_from_env
 from .browser_tracker import BrowserRunConfig, PlaywrightPromptTracker
 from .collectors import MockPromptTracker
-from .connectors import (
-    GoogleHttpClient,
-    MockGA4Connector,
-    MockGSCConnector,
-    RealGA4Connector,
-    RealGSCConnector,
-)
-from .excel_writer import SeoGeoExcelWriter
+from .connectors import GoogleHttpClient, MockGA4Connector, MockGSCConnector, RealGA4Connector, RealGSCConnector
+from .date_utils import month_range
+from .excel_writer import ExcelWriterError, SeoGeoExcelWriter
 from .pipeline import MonthlyReportPipeline
-from .prompt_apis import ApiEngineConfig, GeminiPromptTracker, OpenAIPromptTracker, PerplexityPromptTracker
+from .prompt_apis import ApiEngineConfig, GeminiPromptTracker, OpenAIPromptTracker, PerplexityPromptTracker, PromptApiError
+
+
+class CliInputError(ValueError):
+    pass
 
 
 def parse_args() -> argparse.Namespace:
@@ -52,7 +51,7 @@ def build_connectors(mode: str, property_id: str, access_token: str):
         return MockGA4Connector(), MockGSCConnector()
 
     if not property_id or not access_token:
-        raise ValueError("real mode requires --property-id and --access-token")
+        raise CliInputError("real mode requires --property-id and --access-token")
     client = GoogleHttpClient(access_token=access_token)
     return RealGA4Connector(property_id=property_id, client=client), RealGSCConnector(client=client)
 
@@ -66,26 +65,27 @@ def main() -> None:
         print(json.dumps({"auth_url": url, "state": state}, ensure_ascii=False, indent=2))
         return
 
-    ga4, gsc = build_connectors(args.mode, args.property_id, args.access_token)
-    tracker = build_prompt_tracker(args.prompt_mode)
-    writer = SeoGeoExcelWriter() if args.excel_out else None
-
-    pipeline = MonthlyReportPipeline(
-        ga4=ga4,
-        gsc=gsc,
-        tracker=tracker,
-        excel_writer=writer,
-    )
-
-    prompt_set = [
-        {
-            "prompt_id": "P001",
-            "prompt_type": "직접형",
-            "prompt_text": "SEO GEO 리포트 자동화 솔루션 추천해줘",
-        }
-    ]
-
     try:
+        month_range(args.month)  # validate early
+        ga4, gsc = build_connectors(args.mode, args.property_id, args.access_token)
+        tracker = build_prompt_tracker(args.prompt_mode)
+        writer = SeoGeoExcelWriter() if args.excel_out else None
+
+        pipeline = MonthlyReportPipeline(
+            ga4=ga4,
+            gsc=gsc,
+            tracker=tracker,
+            excel_writer=writer,
+        )
+
+        prompt_set = [
+            {
+                "prompt_id": "P001",
+                "prompt_type": "직접형",
+                "prompt_text": "SEO GEO 리포트 자동화 솔루션 추천해줘",
+            }
+        ]
+
         collected = pipeline.collect(
             client_name=args.client,
             site_url=args.site,
@@ -100,7 +100,7 @@ def main() -> None:
             return
 
         print(json.dumps(asdict(payload), ensure_ascii=False, indent=2))
-    except Exception as exc:
+    except (CliInputError, ValueError, PromptApiError, ExcelWriterError, RuntimeError) as exc:
         print(json.dumps({"error": str(exc)}, ensure_ascii=False, indent=2))
         raise SystemExit(2)
 
