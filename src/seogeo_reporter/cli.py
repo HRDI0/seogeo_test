@@ -85,20 +85,24 @@ def main() -> None:
         }
     ]
 
-    collected = pipeline.collect(
-        client_name=args.client,
-        site_url=args.site,
-        month=args.month,
-        prompt_set=prompt_set,
-    )
-    payload = pipeline.build_payload(collected)
+    try:
+        collected = pipeline.collect(
+            client_name=args.client,
+            site_url=args.site,
+            month=args.month,
+            prompt_set=prompt_set,
+        )
+        payload = pipeline.build_payload(collected)
 
-    if args.excel_out:
-        path = pipeline.export_excel(payload, args.excel_out)
-        print(json.dumps({"excel_output": str(path)}, ensure_ascii=False, indent=2))
-        return
+        if args.excel_out:
+            path = pipeline.export_excel(payload, args.excel_out)
+            print(json.dumps({"excel_output": str(path)}, ensure_ascii=False, indent=2))
+            return
 
-    print(json.dumps(asdict(payload), ensure_ascii=False, indent=2))
+        print(json.dumps(asdict(payload), ensure_ascii=False, indent=2))
+    except Exception as exc:
+        print(json.dumps({"error": str(exc)}, ensure_ascii=False, indent=2))
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":
