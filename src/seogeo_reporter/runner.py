@@ -1,28 +1,23 @@
 from __future__ import annotations
 
 import json
-import os
 
 from .cli import build_connectors, build_prompt_tracker
-from .runtime import default_report_month
+from .config import app_config_from_env
+from .date_utils import month_range
 from .pipeline import MonthlyReportPipeline
 from .excel_writer import SeoGeoExcelWriter
+from .runtime import default_report_month
 
 
 def run_monthly_job() -> dict[str, str]:
-    month = os.getenv("REPORT_MONTH", default_report_month())
-    mode = os.getenv("RUN_MODE", "mock")
-    prompt_mode = os.getenv("PROMPT_MODE", "mock")
-    client_name = os.getenv("CLIENT_NAME", "Demo Client")
-    site_url = os.getenv("SITE_URL", "https://example.com")
+    cfg = app_config_from_env()
+    month = cfg.report_month or default_report_month()
+    month_range(month)  # validate
 
-    property_id = os.getenv("GA4_PROPERTY_ID", "")
-    access_token = os.getenv("GOOGLE_ACCESS_TOKEN", "")
-    excel_out = os.getenv("REPORT_OUTPUT_PATH", "")
-
-    ga4, gsc = build_connectors(mode, property_id, access_token)
-    tracker = build_prompt_tracker(prompt_mode)
-    writer = SeoGeoExcelWriter() if excel_out else None
+    ga4, gsc = build_connectors(cfg.run_mode, cfg.ga4_property_id, cfg.google_access_token)
+    tracker = build_prompt_tracker(cfg.prompt_mode)
+    writer = SeoGeoExcelWriter() if cfg.report_output_path else None
 
     pipeline = MonthlyReportPipeline(ga4=ga4, gsc=gsc, tracker=tracker, excel_writer=writer)
 
@@ -34,19 +29,23 @@ def run_monthly_job() -> dict[str, str]:
         }
     ]
 
-    collected = pipeline.collect(client_name=client_name, site_url=site_url, month=month, prompt_set=prompt_set)
+    collected = pipeline.collect(client_name=cfg.client_name, site_url=cfg.site_url, month=month, prompt_set=prompt_set)
     payload = pipeline.build_payload(collected)
 
-    if excel_out:
-        output = pipeline.export_excel(payload, excel_out)
+    if cfg.report_output_path:
+        output = pipeline.export_excel(payload, cfg.report_output_path)
         return {"status": "ok", "month": month, "excel_output": str(output)}
 
     return {"status": "ok", "month": month, "prompt_rows": str(len(payload.prompt_rows))}
 
 
 def main() -> None:
-    result = run_monthly_job()
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    try:
+        result = run_monthly_job()
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    except Exception as exc:
+        print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False, indent=2))
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":

@@ -31,6 +31,7 @@
 - Parsing: `src/seogeo_reporter/parsing.py`
 - Metrics: `src/seogeo_reporter/scoring.py`
 - SERP 수집기 스텁: `src/seogeo_reporter/serp_collectors.py`
+- 환경설정 로더/검증: `src/seogeo_reporter/config.py`
 
 가시성 등급(Tier 0~4):
 - Tier 0: 브랜드 미언급

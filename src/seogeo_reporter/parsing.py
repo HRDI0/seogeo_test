@@ -13,11 +13,11 @@ def parse_capture(
     official_domains: list[str],
 ) -> ParsedSignal:
     text = artifact.raw_text.lower()
-    brand_mentioned = any(alias.lower() in text for alias in brand_aliases)
+    brand_mentioned = any(_count_alias_occurrences(text, alias.lower()) > 0 for alias in brand_aliases)
 
     competitor_mentions = 0
     for alias in competitor_aliases:
-        competitor_mentions += len(re.findall(re.escape(alias.lower()), text))
+        competitor_mentions += _count_alias_occurrences(text, alias.lower())
 
     citation_urls = list(dict.fromkeys(artifact.citations + artifact.source_panel_urls))
     official, third_party = _split_citations(citation_urls, official_domains)
@@ -95,3 +95,12 @@ def _detect_position_hint(text: str) -> str | None:
     if any(token in text for token in ["1.", "첫", "top"]):
         return "top"
     return None
+
+
+def _count_alias_occurrences(text: str, alias: str) -> int:
+    if not alias:
+        return 0
+    if re.fullmatch(r"[a-z0-9._-]+", alias):
+        pattern = re.compile(rf"\b{re.escape(alias)}\b")
+        return len(pattern.findall(text))
+    return text.count(alias)
