@@ -21,6 +21,19 @@
 - 엑셀 작성기 (`openpyxl` 설치 시 동작)
 - 월간 파이프라인 + CLI 실행기
 
+## 전체 기능 테스트 스크립트
+
+```bash
+scripts/test_all_features.sh
+```
+
+스크립트에서 수행하는 항목:
+- 단위 테스트 전체 실행
+- CLI mock 프롬프트 모드 실행/JSON 검증
+- OAuth URL 출력/JSON 검증
+- browser 모드 의도된 실패(playwright 미설치) 검증
+- `openpyxl` 설치 시 엑셀 출력 검증(미설치 시 skip)
+
 ## 빠른 실행 (Mock)
 
 ```bash
