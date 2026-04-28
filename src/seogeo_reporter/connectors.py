@@ -52,16 +52,17 @@ class GSCConnector:
 class RealGA4Connector(GA4Connector):
     """Fetch monthly summary from GA4 Data API runReport endpoint."""
 
-    def __init__(self, property_id: str, client: GoogleHttpClient) -> None:
+    def __init__(self, property_id: str, client: GoogleHttpClient, ga4_endpoint_base: str = "https://analyticsdata.googleapis.com") -> None:
         if not property_id:
             raise ValueError("property_id is required")
         self.property_id = property_id
         self.client = client
+        self.ga4_endpoint_base = ga4_endpoint_base.rstrip("/")
 
     def fetch_monthly_summary(self, site_url: str, month: str) -> GA4MonthlySummary:
         _ = site_url
         current = month_range(month)
-        url = f"https://analyticsdata.googleapis.com/v1beta/properties/{self.property_id}:runReport"
+        url = f"{self.ga4_endpoint_base}/v1beta/properties/{self.property_id}:runReport"
         payload = {
             "dateRanges": [{"startDate": current.start_date, "endDate": current.end_date}],
             "dimensions": [{"name": "sessionDefaultChannelGroup"}],
@@ -75,11 +76,12 @@ class RealGA4Connector(GA4Connector):
 class RealGSCConnector(GSCConnector):
     """Fetch query-level metrics from Search Console Search Analytics API."""
 
-    def __init__(self, client: GoogleHttpClient, row_limit: int = 250) -> None:
+    def __init__(self, client: GoogleHttpClient, row_limit: int = 250, gsc_endpoint_base: str = "https://searchconsole.googleapis.com") -> None:
         if row_limit <= 0:
             raise ValueError("row_limit must be > 0")
         self.client = client
         self.row_limit = row_limit
+        self.gsc_endpoint_base = gsc_endpoint_base.rstrip("/")
 
     def fetch_keyword_metrics(self, site_url: str, month: str) -> list[KeywordMonthlyMetric]:
         current = month_range(month)
@@ -117,7 +119,7 @@ class RealGSCConnector(GSCConnector):
 
     def _query_page(self, site_url: str, start_date: str, end_date: str, start_row: int) -> list[dict[str, Any]]:
         encoded_site = urllib.parse.quote(site_url, safe="")
-        api_url = f"https://searchconsole.googleapis.com/webmasters/v3/sites/{encoded_site}/searchAnalytics/query"
+        api_url = f"{self.gsc_endpoint_base}/webmasters/v3/sites/{encoded_site}/searchAnalytics/query"
         payload = {
             "startDate": start_date,
             "endDate": end_date,

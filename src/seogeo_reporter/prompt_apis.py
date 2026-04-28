@@ -78,6 +78,10 @@ class BaseApiPromptTracker(PromptTracker):
 class OpenAIPromptTracker(BaseApiPromptTracker):
     engine_name = "gpt"
 
+    def __init__(self, config: ApiEngineConfig, endpoint: str = "https://api.openai.com/v1/responses") -> None:
+        super().__init__(config)
+        self.endpoint = endpoint
+
     def _ask(self, prompt: str) -> dict[str, Any]:
         payload = {
             "model": self.config.model,
@@ -85,7 +89,7 @@ class OpenAIPromptTracker(BaseApiPromptTracker):
             "tools": [{"type": "web_search"}],
         }
         data = self._post_json(
-            url="https://api.openai.com/v1/responses",
+            url=self.endpoint,
             headers={
                 "Authorization": f"Bearer {self.config.api_key}",
                 "Content-Type": "application/json",
@@ -114,8 +118,12 @@ class OpenAIPromptTracker(BaseApiPromptTracker):
 class GeminiPromptTracker(BaseApiPromptTracker):
     engine_name = "gemini"
 
+    def __init__(self, config: ApiEngineConfig, endpoint_base: str = "https://generativelanguage.googleapis.com") -> None:
+        super().__init__(config)
+        self.endpoint_base = endpoint_base.rstrip("/")
+
     def _ask(self, prompt: str) -> dict[str, Any]:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.config.model}:generateContent?key={self.config.api_key}"
+        url = f"{self.endpoint_base}/v1beta/models/{self.config.model}:generateContent?key={self.config.api_key}"
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "tools": [{"googleSearch": {}}],
@@ -143,6 +151,10 @@ class GeminiPromptTracker(BaseApiPromptTracker):
 class PerplexityPromptTracker(BaseApiPromptTracker):
     engine_name = "perplexity"
 
+    def __init__(self, config: ApiEngineConfig, endpoint: str = "https://api.perplexity.ai/chat/completions") -> None:
+        super().__init__(config)
+        self.endpoint = endpoint
+
     def _ask(self, prompt: str) -> dict[str, Any]:
         payload = {
             "model": self.config.model,
@@ -150,7 +162,7 @@ class PerplexityPromptTracker(BaseApiPromptTracker):
             "return_citations": True,
         }
         data = self._post_json(
-            "https://api.perplexity.ai/chat/completions",
+            self.endpoint,
             {
                 "Authorization": f"Bearer {self.config.api_key}",
                 "Content-Type": "application/json",

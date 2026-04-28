@@ -62,6 +62,17 @@ python -m src.seogeo_reporter.runner
 - `PROMPT_MODE` (`mock`/`openai`/`gemini`/`perplexity`/`browser`)
 - `TOKEN_STORE_MODE` (`plain`/`encrypted`)
 
+## 예시 API 검증 (외부 API 없이)
+
+```bash
+scripts/verify_example_apis.sh
+```
+
+로컬 mock API 서버(`examples/mock_api_server.py`)를 띄워서 아래를 검증합니다.
+- RealGA4Connector
+- RealGSCConnector
+- OpenAI/Gemini/Perplexity Prompt Tracker
+
 ## 전체 기능 테스트 스크립트
 
 ```bash
