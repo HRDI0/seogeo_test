@@ -55,3 +55,5 @@ class ParsedSignal:
     position_hint: str | None
     detected_modules: list[str]
     tier: VisibilityTier
+    brand_mention_count: int = 0
+    brand_importance_score: float = 0.0

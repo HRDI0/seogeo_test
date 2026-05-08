@@ -23,6 +23,8 @@ class ParsingScoringTests(unittest.TestCase):
         self.assertEqual(signal.tier, VisibilityTier.TIER_3)
         self.assertTrue(signal.brand_mentioned)
         self.assertEqual(len(signal.official_citation_urls), 1)
+        self.assertGreater(signal.brand_importance_score, 0)
+        self.assertEqual(signal.brand_mention_count, 1)
 
     def test_metrics_calculation(self) -> None:
         signals = [

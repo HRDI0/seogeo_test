@@ -17,6 +17,8 @@
   - OpenAI Responses + web search
   - Gemini grounding
   - Perplexity
+- Prompt 입력: CSV/XLSX 업로드(`prompt_text`/`prompt`/`query` 컬럼) 또는 CLI 반복 인자 직접 입력
+- 브랜드 중요도 점수(언급 위치 + 빈도 기반 0~100) 및 경쟁사 언급 횟수 계산
 - Playwright 기반 브라우저 추적기 (스크린샷/HTML 저장)
 - 엑셀 작성기 (`openpyxl` 설치 시 동작)
 - 월간 파이프라인 + CLI 실행기
@@ -88,8 +90,20 @@ scripts/test_all_features.sh
 
 ## 빠른 실행 (Mock)
 
+## 로컬 개발 환경 준비 (PYTHONPATH + 의존성)
+
 ```bash
-python -m src.seogeo_reporter.cli --month 2026-03 --mode mock --prompt-mode mock
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip pytest openpyxl playwright requests
+python -m playwright install chromium
+export PYTHONPATH=.
+```
+
+Playwright 기반 실사용 추적(특히 Google AI Mode/AI Overview)은 로그인 세션/자동화 감지 상황에 따라 수집 안정성이 달라질 수 있으므로, 기본적으로 스크린샷과 HTML 원본을 모두 보관해 사후 검증하도록 설계했습니다.
+
+```bash
+python -m src.seogeo_reporter.cli --month 2026-03 --mode mock --prompt-mode mock --prompt "SEO 자동화 솔루션 추천"
 ```
 
 ## OAuth URL 출력
@@ -117,3 +131,14 @@ python -m src.seogeo_reporter.cli --month 2026-03 --excel-out out/report_2026-03
 
 > `openpyxl` 미설치 환경에서는 엑셀 출력 시 예외가 발생합니다.
 > `playwright` 미설치 환경에서는 browser 모드 실행 시 예외가 발생합니다.
+
+
+### 프롬프트 대량 업로드 예시
+
+```bash
+python -m src.seogeo_reporter.cli \
+  --month 2026-03 \
+  --mode mock \
+  --prompt-mode mock \
+  --prompt-file prompts.csv
+```
