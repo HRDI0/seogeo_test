@@ -13,7 +13,9 @@ def parse_capture(
     official_domains: list[str],
 ) -> ParsedSignal:
     text = artifact.raw_text.lower()
-    brand_mentioned = any(_count_alias_occurrences(text, alias.lower()) > 0 for alias in brand_aliases)
+    brand_counts = [_count_alias_occurrences(text, alias.lower()) for alias in brand_aliases]
+    brand_mention_count = sum(brand_counts)
+    brand_mentioned = brand_mention_count > 0
 
     competitor_mentions = 0
     for alias in competitor_aliases:
@@ -24,6 +26,11 @@ def parse_capture(
 
     sentiment = _detect_sentiment(text)
     position_hint = _detect_position_hint(text)
+    brand_importance_score = _compute_brand_importance_score(
+        raw_text=artifact.raw_text,
+        brand_aliases=brand_aliases,
+        brand_mention_count=brand_mention_count,
+    )
 
     tier = infer_visibility_tier(
         brand_mentioned=brand_mentioned,
@@ -44,6 +51,8 @@ def parse_capture(
         position_hint=position_hint,
         detected_modules=artifact.detected_modules,
         tier=tier,
+        brand_mention_count=brand_mention_count,
+        brand_importance_score=brand_importance_score,
     )
 
 
@@ -104,3 +113,18 @@ def _count_alias_occurrences(text: str, alias: str) -> int:
         pattern = re.compile(rf"\b{re.escape(alias)}\b")
         return len(pattern.findall(text))
     return text.count(alias)
+
+
+def _compute_brand_importance_score(raw_text: str, brand_aliases: list[str], brand_mention_count: int) -> float:
+    if not raw_text.strip() or brand_mention_count <= 0:
+        return 0.0
+    text = raw_text.lower()
+    earliest = 1.0
+    for alias in brand_aliases:
+        idx = text.find(alias.lower())
+        if idx >= 0:
+            earliest = min(earliest, idx / max(len(text), 1))
+    position_score = 1.0 - earliest
+    freq_score = min(1.0, brand_mention_count / 8.0)
+    score = (position_score * 0.6) + (freq_score * 0.4)
+    return round(score * 100, 2)

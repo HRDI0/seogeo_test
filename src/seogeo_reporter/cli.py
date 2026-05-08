@@ -12,6 +12,7 @@ from .connectors import GoogleHttpClient, MockGA4Connector, MockGSCConnector, Re
 from .date_utils import month_range
 from .excel_writer import ExcelWriterError, SeoGeoExcelWriter
 from .pipeline import MonthlyReportPipeline
+from .prompt_inputs import PromptInputError, load_prompt_set
 from .prompt_apis import ApiEngineConfig, GeminiPromptTracker, OpenAIPromptTracker, PerplexityPromptTracker, PromptApiError
 
 
@@ -30,6 +31,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--access-token", default="")
     parser.add_argument("--excel-out", default="")
     parser.add_argument("--print-oauth-url", action="store_true")
+    parser.add_argument("--prompt-file", default="", help="CSV/XLSX with prompt_text|prompt|query column")
+    parser.add_argument("--prompt", action="append", default=[], help="Add one prompt directly (repeatable)")
     return parser.parse_args()
 
 
@@ -78,13 +81,7 @@ def main() -> None:
             excel_writer=writer,
         )
 
-        prompt_set = [
-            {
-                "prompt_id": "P001",
-                "prompt_type": "직접형",
-                "prompt_text": "SEO GEO 리포트 자동화 솔루션 추천해줘",
-            }
-        ]
+        prompt_set = load_prompt_set(args.prompt_file or None, args.prompt)
 
         collected = pipeline.collect(
             client_name=args.client,
@@ -100,7 +97,7 @@ def main() -> None:
             return
 
         print(json.dumps(asdict(payload), ensure_ascii=False, indent=2))
-    except (CliInputError, ValueError, PromptApiError, ExcelWriterError, RuntimeError) as exc:
+    except (CliInputError, PromptInputError, ValueError, PromptApiError, ExcelWriterError, RuntimeError) as exc:
         print(json.dumps({"error": str(exc)}, ensure_ascii=False, indent=2))
         raise SystemExit(2)
 
